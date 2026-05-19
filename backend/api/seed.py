@@ -1,0 +1,190 @@
+from .models import AssessmentQuestion, JournalPrompt, TestDefinition, TestQuestion
+
+
+def seed_all():
+    journal_prompts = [
+        ('release_worry', 'What is the biggest worry on your mind right now?', 1),
+        ('release_worry', 'How is this worry affecting your daily life?', 2),
+        ('release_worry', 'What is one small step you can take to address this worry?', 3),
+        ('release_worry', 'Write a letter to yourself letting go of this worry.', 4),
+        ('calm_anxiety', 'Describe what your anxiety feels like physically right now.', 1),
+        ('calm_anxiety', 'What triggered your anxiety today?', 2),
+        ('calm_anxiety', 'List 3 things you can see, hear, and feel right now.', 3),
+        ('calm_anxiety', 'What would you tell a friend who feels the same way?', 4),
+        ('feeling_angry', 'What happened that made you feel angry?', 1),
+        ('feeling_angry', 'On a scale of 1-10, how intense is your anger?', 2),
+        ('feeling_angry', 'What need of yours is not being met right now?', 3),
+        ('feeling_angry', 'How can you express this anger in a healthy way?', 4),
+        ('feeling_happy', 'What made you feel happy today?', 1),
+        ('feeling_happy', 'Who contributed to your happiness today?', 2),
+        ('feeling_happy', 'How can you create more moments like this?', 3),
+        ('feeling_happy', 'Describe this happy moment in vivid detail.', 4),
+    ]
+
+    for journal_type, question_text, order_num in journal_prompts:
+        JournalPrompt.objects.get_or_create(
+            journal_type=journal_type,
+            question_text=question_text,
+            order_num=order_num,
+        )
+
+    tests_data = [
+        {
+            'title': 'Personality Type',
+            'description': 'Want to know what kind of person you are? This test will give you insights into your personality traits and tendencies.',
+            'duration_min': 8,
+            'question_count': 13,
+            'category': 'personality',
+            'image_color': '#FF6B9D',
+            'is_featured': True,
+            'questions': [
+                'I enjoy being the center of attention at social gatherings.',
+                'I prefer to plan things in advance rather than being spontaneous.',
+                'I often feel deeply affected by other people\'s emotions.',
+                'I find it easy to start conversations with strangers.',
+                'I prefer working alone rather than in a team.',
+                'I tend to make decisions based on logic rather than feelings.',
+                'I enjoy trying new and unusual experiences.',
+                'I consider myself more of a night owl than an early bird.',
+                'I feel energized after spending time with a large group of people.',
+                'I prefer routine and predictability in my daily life.',
+                'I often daydream and get lost in my imagination.',
+                'I believe rules are meant to be followed strictly.',
+                'I find it easy to adapt to new situations quickly.',
+            ],
+        },
+        {
+            'title': 'Emotional Intelligence',
+            'description': 'Discover how well you understand and manage emotions - both yours and others.',
+            'duration_min': 6,
+            'question_count': 10,
+            'category': 'emotional',
+            'image_color': '#6C63FF',
+            'is_featured': False,
+            'questions': [
+                'I can usually tell when someone is upset even if they don\'t say anything.',
+                'I find it easy to control my emotions in stressful situations.',
+                'I often reflect on why I feel a certain way.',
+                'I can stay calm when others around me are panicking.',
+                'I am good at motivating myself to complete difficult tasks.',
+                'I can easily put myself in someone else\'s shoes.',
+                'I handle criticism without getting defensive.',
+                'I can recognize my emotional triggers before they affect my behavior.',
+                'I am comfortable expressing my feelings to others.',
+                'I can resolve conflicts between people effectively.',
+            ],
+        },
+        {
+            'title': 'Stress Resilience',
+            'description': 'How well do you bounce back from challenges? Find out your resilience score.',
+            'duration_min': 5,
+            'question_count': 10,
+            'category': 'wellness',
+            'image_color': '#00D2FF',
+            'is_featured': False,
+            'questions': [
+                'I recover quickly from setbacks and disappointments.',
+                'I see challenges as opportunities to grow.',
+                'I have a strong support network of friends and family.',
+                'I maintain healthy habits even during stressful times.',
+                'I can find humor in difficult situations.',
+                'I believe I have control over how I respond to stress.',
+                'I practice self-care activities regularly.',
+                'I can ask for help when I need it without feeling weak.',
+                'I have clear goals that give me purpose during tough times.',
+                'I can let go of things I cannot control.',
+            ],
+        },
+        {
+            'title': 'Self-Confidence',
+            'description': 'Explore your level of self-confidence and learn about areas where you can grow.',
+            'duration_min': 5,
+            'question_count': 10,
+            'category': 'personality',
+            'image_color': '#FFB74D',
+            'is_featured': False,
+            'questions': [
+                'I feel comfortable expressing my opinions in group settings.',
+                'I believe I can achieve most goals I set for myself.',
+                'I don\'t compare myself to others frequently.',
+                'I can accept compliments gracefully without deflecting.',
+                'I trust my own judgment when making important decisions.',
+                'I feel worthy of love and respect from others.',
+                'I can handle rejection without it affecting my self-worth.',
+                'I am comfortable with who I am, flaws and all.',
+                'I take on new challenges without excessive fear of failure.',
+                'I speak up for myself when my boundaries are crossed.',
+            ],
+        },
+        {
+            'title': 'Mindfulness Awareness',
+            'description': 'How present are you in your daily life? Discover your mindfulness level.',
+            'duration_min': 5,
+            'question_count': 10,
+            'category': 'wellness',
+            'image_color': '#4CAF50',
+            'is_featured': False,
+            'questions': [
+                'I pay attention to my breathing throughout the day.',
+                'I eat my meals slowly and savor each bite.',
+                'I notice the small details in my surroundings regularly.',
+                'I can focus on one task without my mind wandering.',
+                'I am aware of my body\'s physical sensations throughout the day.',
+                'I listen fully when someone is speaking to me.',
+                'I take moments to appreciate the present moment.',
+                'I can observe my thoughts without getting caught up in them.',
+                'I notice when I\'m running on autopilot and bring myself back.',
+                'I practice gratitude for the little things in life.',
+            ],
+        },
+        {
+            'title': 'Communication Style',
+            'description': 'Discover how you communicate with others and find ways to improve your relationships.',
+            'duration_min': 6,
+            'question_count': 12,
+            'category': 'social',
+            'image_color': '#E91E63',
+            'is_featured': False,
+            'questions': [
+                'I prefer to address conflicts directly rather than avoiding them.',
+                'I often use "I feel" statements when expressing myself.',
+                'I find it easy to say "no" when I need to.',
+                'I tend to listen more than I speak in conversations.',
+                'I express appreciation and gratitude to people regularly.',
+                'I can disagree with someone without being aggressive.',
+                'I pay attention to body language during conversations.',
+                'I ask clarifying questions when I don\'t understand something.',
+                'I share my feelings openly with people I trust.',
+                'I can give constructive feedback without hurting feelings.',
+                'I remain respectful even in heated discussions.',
+                'I make eye contact when speaking with others.',
+            ],
+        },
+    ]
+
+    for test_data in tests_data:
+        questions = test_data.pop('questions')
+        test, _ = TestDefinition.objects.get_or_create(title=test_data['title'], defaults=test_data)
+        for order_num, question_text in enumerate(questions, start=1):
+            TestQuestion.objects.get_or_create(test=test, order_num=order_num, defaults={'question_text': question_text})
+
+    assessment_questions = [
+        ('I feel satisfied with my personal growth over the past month.', 'self_awareness', 1),
+        ('I regularly set and work towards meaningful goals.', 'motivation', 2),
+        ('I handle unexpected changes with flexibility.', 'adaptability', 3),
+        ('I maintain healthy boundaries in my relationships.', 'relationships', 4),
+        ('I practice self-compassion when I make mistakes.', 'self_awareness', 5),
+        ('I take time to reflect on my experiences and learn from them.', 'self_awareness', 6),
+        ('I feel connected to a sense of purpose in my life.', 'motivation', 7),
+        ('I can manage my time effectively between work and personal life.', 'productivity', 8),
+        ('I express my emotions in healthy and constructive ways.', 'emotional_health', 9),
+        ('I prioritize my physical health through exercise and nutrition.', 'physical_health', 10),
+        ('I seek out new learning opportunities regularly.', 'growth', 11),
+        ('I feel grateful for what I have in my life.', 'emotional_health', 12),
+        ('I am open to receiving feedback from others.', 'relationships', 13),
+        ('I take breaks when I feel overwhelmed or stressed.', 'self_care', 14),
+        ('I celebrate my achievements, no matter how small.', 'self_awareness', 15),
+    ]
+
+    for question_text, category, order_num in assessment_questions:
+        AssessmentQuestion.objects.get_or_create(question_text=question_text, category=category, order_num=order_num)
