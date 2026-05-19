@@ -1,0 +1,12 @@
+backend/venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+test-results/
+dist/
+build/
+node_modules/

@@ -154,10 +154,15 @@ cd "C:\Users\sumit\WArp test\mindbloom\backend"
 # Create a Python virtual environment
 python -m venv venv
 
-# Activate the virtual environment (Windows PowerShell)
+# Activate the virtual environment
+# Windows PowerShell:
 .\venv\Scripts\Activate.ps1
+# Windows (CMD):
+venv\Scripts\activate.bat
+# macOS / Linux (bash/zsh):
+source venv/bin/activate
 
-# If you get an execution policy error, run this first:
+# If you get an execution policy error on PowerShell, run:
 # Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # Install Python dependencies

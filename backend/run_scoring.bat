@@ -1,4 +1,10 @@
 @echo off
-cd /d "E:\MindBloomV1-main reppair\MindBloomV1-main\backend"
+REM Change working directory to the script's folder (the `backend` dir)
+cd /d "%~dp0"
 set PYTHONPATH=%CD%
-"E:\MindBloomV1-main reppair\MindBloomV1-main\backend\venv\Scripts\python.exe" manage.py run_anomaly_scoring --data-dir backend/ml_data --model-dir "E:\MindBloomV1-main reppair\MindBloomV1-main\backend\backend\ml_models" --features backend/ml_data/features.parquet --threshold 0.0
+REM Prefer a local venv if present, otherwise fall back to system `python`
+if exist "%~dp0venv\Scripts\python.exe" (
+	"%~dp0venv\Scripts\python.exe" manage.py run_anomaly_scoring --data-dir ml_data --model-dir ml_models --features ml_data/features.parquet --threshold 0.0
+) else (
+	python manage.py run_anomaly_scoring --data-dir ml_data --model-dir ml_models --features ml_data/features.parquet --threshold 0.0
+)

@@ -1,8 +1,0 @@
-{
-  "rows": 6,
-  "threshold": 0.0,
-  "score_min": 0.0,
-  "score_max": 0.0,
-  "score_mean": 0.0,
-  "model_dir": "backend/ml_models"
-}
