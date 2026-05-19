@@ -51,11 +51,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'mindbloom.wsgi.application'
 
-mysql_database_url = os.environ.get('DATABASE_URL')
-if mysql_database_url and mysql_database_url.startswith('mysql'):
+database_url = os.environ.get('DATABASE_URL', '') or os.environ.get('MYSQL_URL', '')
+mysql_host = (os.environ.get('MYSQL_HOST', '') or os.environ.get('MYSQLHOST', '')).strip()
+mysql_user = (os.environ.get('MYSQL_USER', '') or os.environ.get('MYSQLUSER', '')).strip()
+mysql_password = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MYSQLPASSWORD', '')
+mysql_name = (os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MYSQLDATABASE', '')).strip()
+mysql_port = (os.environ.get('MYSQL_PORT', '') or os.environ.get('MYSQLPORT', '3306')).strip()
+
+if database_url and database_url.startswith('mysql'):
     from urllib.parse import urlparse, unquote
 
-    parsed = urlparse(mysql_database_url)
+    parsed = urlparse(database_url)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
@@ -67,16 +73,23 @@ if mysql_database_url and mysql_database_url.startswith('mysql'):
             'OPTIONS': {'charset': 'utf8mb4'},
         }
     }
-else:
+elif mysql_host or mysql_user or mysql_password or mysql_name:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
-            'NAME': os.environ.get('MYSQL_DATABASE', 'mindbloom'),
-            'USER': os.environ.get('MYSQL_USER', 'root'),
-            'PASSWORD': os.environ.get('MYSQL_PASSWORD', ''),
-            'HOST': os.environ.get('MYSQL_HOST', 'localhost'),
-            'PORT': os.environ.get('MYSQL_PORT', '3306'),
+            'NAME': mysql_name or 'mindbloom',
+            'USER': mysql_user or 'root',
+            'PASSWORD': mysql_password,
+            'HOST': mysql_host or 'localhost',
+            'PORT': mysql_port or '3306',
             'OPTIONS': {'charset': 'utf8mb4'},
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 

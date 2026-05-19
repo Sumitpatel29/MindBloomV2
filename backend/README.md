@@ -80,9 +80,9 @@ npm --version
 
 ## Database Setup
 
-MindBloom now uses one persistent MySQL database for all app data. The Django backend creates tables and seeds reference data against that same database.
+MindBloom uses MySQL when you provide database env vars, and falls back to a local SQLite database when you do not.
 
-### 1. Install MySQL
+### 1. Install MySQL (optional if you want persistent external storage)
 
 Install MySQL Server 8.x and make sure the service is running.
 
@@ -106,6 +106,8 @@ FLUSH PRIVILEGES;
 This is a one-time setup. After that, the app keeps using the same `mindbloom` database.
 
 If you are using a remote MySQL server, replace `'localhost'` with the appropriate host and allow that host in the user definition.
+
+If you do not set any MySQL env vars, the backend uses `backend/db.sqlite3` automatically. That is convenient for local development and simple deployments, but data will be tied to the container or workspace.
 
 ### 3. Configure Environment Variables
 
