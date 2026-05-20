@@ -32,8 +32,6 @@ class Command(BaseCommand):
                 break
             except OperationalError as e:
                 last_exc = e
-                if attempt == 10:
-                    raise
                 time.sleep(3)
 
         # Only seed when migrations succeeded.
@@ -43,7 +41,8 @@ class Command(BaseCommand):
         else:
             self.stdout.write(
                 self.style.WARNING(
-                    f'Database bootstrap skipped because migrations failed: {last_exc}'
+                    f'Database bootstrap skipped because migrations failed after retries: {last_exc}'
                 )
             )
-            self.stdout.write(self.style.WARNING('App will start but DB-backed endpoints may fail.'))
+            self.stdout.write(self.style.WARNING('App will start; DB-backed endpoints may fail until DB is reachable.'))
+
