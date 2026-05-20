@@ -51,13 +51,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'mindbloom.wsgi.application'
 
-database_url = os.environ.get('DATABASE_URL', '') or os.environ.get('MYSQL_URL', '')
+database_url = (
+    os.environ.get('DATABASE_URL', '')
+    or os.environ.get('MYSQL_URL', '')
+    or os.environ.get('CLEARDB_DATABASE_URL', '')
+    or os.environ.get('JAWSDB_URL', '')
+)
 mysql_host = (os.environ.get('MYSQL_HOST', '') or os.environ.get('MYSQLHOST', '')).strip()
 mysql_user = (os.environ.get('MYSQL_USER', '') or os.environ.get('MYSQLUSER', '')).strip()
 mysql_password = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MYSQLPASSWORD', '')
 mysql_name = (os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MYSQLDATABASE', '')).strip()
 mysql_port = (os.environ.get('MYSQL_PORT', '') or os.environ.get('MYSQLPORT', '3306')).strip()
 
+# Prefer full DATABASE_URL variants (common platform names), otherwise require
+# at least a database name plus one credential to select MySQL. This prevents
+# accidental MySQL selection when only a single unrelated MYSQL_* var exists.
 if database_url and database_url.startswith('mysql'):
     from urllib.parse import urlparse, unquote
 
@@ -73,7 +81,7 @@ if database_url and database_url.startswith('mysql'):
             'OPTIONS': {'charset': 'utf8mb4'},
         }
     }
-elif mysql_host or mysql_user or mysql_password or mysql_name:
+elif mysql_name and (mysql_host or mysql_user or mysql_password):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
