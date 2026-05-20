@@ -146,8 +146,10 @@ if not DEBUG:
 # --- JWT ---
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
 JWT_ACCESS_TOKEN_EXPIRES_DAYS = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES_DAYS', '7'))
+JWT_REMEMBER_TOKEN_EXPIRES_DAYS = int(os.environ.get('JWT_REMEMBER_TOKEN_EXPIRES_DAYS', '30'))
 
 # --- Celery ---
+
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)
 CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'False').lower() == 'true'

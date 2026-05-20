@@ -8,11 +8,17 @@ from django.http import JsonResponse
 from .models import User
 
 
-def create_access_token(user_id):
+def create_access_token(user_id, remember_me: bool = False):
+    now = datetime.now(timezone.utc)
+    exp_days = settings.JWT_ACCESS_TOKEN_EXPIRES_DAYS
+    if remember_me:
+        exp_days = int(getattr(settings, 'JWT_REMEMBER_TOKEN_EXPIRES_DAYS', 30))
+
     payload = {
         'sub': str(user_id),
-        'iat': datetime.now(timezone.utc),
-        'exp': datetime.now(timezone.utc) + timedelta(days=settings.JWT_ACCESS_TOKEN_EXPIRES_DAYS),
+        'iat': now,
+        'exp': now + timedelta(days=exp_days),
+        'rm': bool(remember_me),
     }
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm='HS256')
 
@@ -75,3 +81,4 @@ def admin_required(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapper
+

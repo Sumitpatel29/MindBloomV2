@@ -13,34 +13,59 @@ export function AuthProvider({ children }) {
       authAPI.getMe()
         .then((data) => setUser(data.user))
         .catch((err) => {
-          // Only remove the token if it is actually invalid/expired (401).
-          // Do NOT remove it on network errors (backend not started yet, etc.)
-          // so that the user stays logged in when they restart the backend.
           if (err && err.status === 401) {
             localStorage.removeItem('mindbloom_token');
           }
-          // For any other error (network down, 500, etc.) keep the token —
-          // the user will be shown the login page but won't lose their account.
         })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
+
+    // Idle auto-logout (client-side)
+    const idleMinutes = parseInt(import.meta.env.VITE_IDLE_LOGOUT_MINUTES || '30', 10);
+    let lastActivity = Date.now();
+    const logoutOnIdle = () => {
+      const tokenNow = localStorage.getItem('mindbloom_token');
+      if (!tokenNow) return;
+      if (Date.now() - lastActivity >= idleMinutes * 60 * 1000) {
+        localStorage.removeItem('mindbloom_token');
+        setUser(null);
+      }
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    const bump = () => { lastActivity = Date.now(); };
+    activityEvents.forEach((ev) => window.addEventListener(ev, bump, { passive: true }));
+    const timer = window.setInterval(logoutOnIdle, 60 * 1000);
+
+    return () => {
+      activityEvents.forEach((ev) => window.removeEventListener(ev, bump));
+      window.clearInterval(timer);
+    };
   }, []);
 
-  const login = async (email, password) => {
-    const data = await authAPI.login({ email, password });
+
+  const login = async (email, password, rememberMe = false) => {
+    const data = await authAPI.login({ email, password, remember_me: rememberMe });
     localStorage.setItem('mindbloom_token', data.token);
     setUser(data.user);
     return data;
   };
 
   const register = async (username, email, password, display_name) => {
+    // OTP flow: register does NOT return a token.
     const data = await authAPI.register({ username, email, password, display_name });
+    return data;
+  };
+
+  const verifyOtpAndLogin = async ({ email, otp, rememberMe = false }) => {
+    const data = await authAPI.verifyOtp({ email, otp, remember_me: rememberMe });
     localStorage.setItem('mindbloom_token', data.token);
     setUser(data.user);
     return data;
   };
+
 
   const logout = () => {
     localStorage.removeItem('mindbloom_token');
@@ -55,11 +80,12 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, verifyOtpAndLogin, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

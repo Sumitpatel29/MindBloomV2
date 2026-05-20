@@ -1,6 +1,8 @@
+import hashlib
 import json
 import os
 import random
+import threading
 import uuid
 from datetime import date, datetime, timedelta
 
@@ -10,8 +12,7 @@ from django.core.files.storage import FileSystemStorage
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from .auth import create_access_token, jwt_required
-from .auth import admin_required
+from .auth import admin_required, create_access_token, jwt_required
 from .models import (
     AssessmentQuestion,
     AssessmentResult,
@@ -24,7 +25,6 @@ from .models import (
     TestResult,
     User,
 )
-import threading
 from .ml_models import job_tracker
 
 
@@ -32,19 +32,74 @@ FEELING_OPTIONS = ['Happy', 'Sad', 'Anxious', 'Calm', 'Excited', 'Tired', 'Grate
 ACTIVITY_OPTIONS = ['Exercise', 'Reading', 'Meditation', 'Cooking', 'Walking', 'Music', 'Art', 'Socializing', 'Work', 'Gaming', 'Shopping', 'Cleaning', 'Studying', 'Watching TV', 'Journaling', 'Yoga', 'Dancing', 'Photography', 'Gardening', 'Travel']
 
 MUSIC_BY_MOOD = {
-    1: [{'title': 'Weightless', 'artist': 'Marconi Union', 'genre': 'Ambient', 'emoji': '🎵', 'reason': 'Scientifically shown to reduce anxiety'}, {'title': 'Clair de Lune', 'artist': 'Debussy', 'genre': 'Classical', 'emoji': '🌙', 'reason': 'Gentle melodies to soothe your mind'}, {'title': 'Skinny Love', 'artist': 'Bon Iver', 'genre': 'Indie Folk', 'emoji': '🍂', 'reason': 'Sometimes sad music helps you process emotions'}, {'title': 'River Flows in You', 'artist': 'Yiruma', 'genre': 'Piano', 'emoji': '🎹', 'reason': 'Calming piano to ease your thoughts'}],
-    2: [{'title': 'Better Days', 'artist': 'OneRepublic', 'genre': 'Pop', 'emoji': '🌤️', 'reason': 'A hopeful reminder that things get better'}, {'title': 'Fix You', 'artist': 'Coldplay', 'genre': 'Alternative', 'emoji': '💫', 'reason': 'A comforting melody for tough times'}, {'title': 'Breathe Me', 'artist': 'Sia', 'genre': 'Indie', 'emoji': '🫧', 'reason': 'Let it out - it is okay to feel'}, {'title': 'Holocene', 'artist': 'Bon Iver', 'genre': 'Indie Folk', 'emoji': '🏔️', 'reason': 'Find peace in the bigger picture'}],
-    3: [{'title': 'Lo-fi Study Beats', 'artist': 'Chillhop', 'genre': 'Lo-fi', 'emoji': '☕', 'reason': 'Perfect background for a calm day'}, {'title': 'Electric Feel', 'artist': 'MGMT', 'genre': 'Indie Pop', 'emoji': '⚡', 'reason': 'A subtle energy boost for your day'}, {'title': 'Here Comes the Sun', 'artist': 'The Beatles', 'genre': 'Classic Rock', 'emoji': '☀️', 'reason': 'A timeless mood brightener'}, {'title': 'Sunflower', 'artist': 'Post Malone', 'genre': 'Pop', 'emoji': '🌻', 'reason': 'Light and easy vibes'}],
-    4: [{'title': 'Happy', 'artist': 'Pharrell Williams', 'genre': 'Pop', 'emoji': '😊', 'reason': 'Match your great mood!'}, {'title': 'Walking on Sunshine', 'artist': 'Katrina & The Waves', 'genre': 'Pop Rock', 'emoji': '🌈', 'reason': 'Keep the good energy flowing'}, {'title': 'Uptown Funk', 'artist': 'Bruno Mars', 'genre': 'Funk Pop', 'emoji': '🕺', 'reason': 'Dance it out!'}, {'title': "Don't Stop Me Now", 'artist': 'Queen', 'genre': 'Rock', 'emoji': '🚀', 'reason': 'You are unstoppable today'}],
-    5: [{'title': 'Levitating', 'artist': 'Dua Lipa', 'genre': 'Dance Pop', 'emoji': '✨', 'reason': 'You are on top of the world!'}, {'title': 'Blinding Lights', 'artist': 'The Weeknd', 'genre': 'Synth Pop', 'emoji': '💃', 'reason': 'Celebrate this amazing feeling'}, {'title': 'On Top of the World', 'artist': 'Imagine Dragons', 'genre': 'Pop Rock', 'emoji': '🏆', 'reason': 'A soundtrack for your best day'}, {'title': 'Good as Hell', 'artist': 'Lizzo', 'genre': 'Pop', 'emoji': '💪', 'reason': 'Confidence anthem for a great day'}],
+    1: [
+        {'title': 'Weightless', 'artist': 'Marconi Union', 'genre': 'Ambient', 'emoji': '🎵', 'reason': 'Scientifically shown to reduce anxiety'},
+        {'title': 'Clair de Lune', 'artist': 'Debussy', 'genre': 'Classical', 'emoji': '🌙', 'reason': 'Gentle melodies to soothe your mind'},
+        {'title': 'Skinny Love', 'artist': 'Bon Iver', 'genre': 'Indie Folk', 'emoji': '🍂', 'reason': 'Sometimes sad music helps you process emotions'},
+        {'title': 'River Flows in You', 'artist': 'Yiruma', 'genre': 'Piano', 'emoji': '🎹', 'reason': 'Calming piano to ease your thoughts'},
+    ],
+    2: [
+        {'title': 'Better Days', 'artist': 'OneRepublic', 'genre': 'Pop', 'emoji': '🌤️', 'reason': 'A hopeful reminder that things get better'},
+        {'title': 'Fix You', 'artist': 'Coldplay', 'genre': 'Alternative', 'emoji': '💫', 'reason': 'A comforting melody for tough times'},
+        {'title': 'Breathe Me', 'artist': 'Sia', 'genre': 'Indie', 'emoji': '🫧', 'reason': 'Let it out - it is okay to feel'},
+        {'title': 'Holocene', 'artist': 'Bon Iver', 'genre': 'Indie Folk', 'emoji': '🏔️', 'reason': 'Find peace in the bigger picture'},
+    ],
+    3: [
+        {'title': 'Lo-fi Study Beats', 'artist': 'Chillhop', 'genre': 'Lo-fi', 'emoji': '☕', 'reason': 'Perfect background for a calm day'},
+        {'title': 'Electric Feel', 'artist': 'MGMT', 'genre': 'Indie Pop', 'emoji': '⚡', 'reason': 'A subtle energy boost for your day'},
+        {'title': 'Here Comes the Sun', 'artist': 'The Beatles', 'genre': 'Classic Rock', 'emoji': '☀️', 'reason': 'A timeless mood brightener'},
+        {'title': 'Sunflower', 'artist': 'Post Malone', 'genre': 'Pop', 'emoji': '🌻', 'reason': 'Light and easy vibes'},
+    ],
+    4: [
+        {'title': 'Happy', 'artist': 'Pharrell Williams', 'genre': 'Pop', 'emoji': '😊', 'reason': 'Match your great mood!'},
+        {'title': 'Walking on Sunshine', 'artist': 'Katrina & The Waves', 'genre': 'Pop Rock', 'emoji': '🌈', 'reason': 'Keep the good energy flowing'},
+        {'title': 'Uptown Funk', 'artist': 'Bruno Mars', 'genre': 'Funk Pop', 'emoji': '🕺', 'reason': 'Dance it out!'},
+        {'title': "Don't Stop Me Now", 'artist': 'Queen', 'genre': 'Rock', 'emoji': '🚀', 'reason': 'You are unstoppable today'},
+    ],
+    5: [
+        {'title': 'Levitating', 'artist': 'Dua Lipa', 'genre': 'Dance Pop', 'emoji': '✨', 'reason': 'You are on top of the world!'},
+        {'title': 'Blinding Lights', 'artist': 'The Weeknd', 'genre': 'Synth Pop', 'emoji': '💃', 'reason': 'Celebrate this amazing feeling'},
+        {'title': 'On Top of the World', 'artist': 'Imagine Dragons', 'genre': 'Pop Rock', 'emoji': '🏆', 'reason': 'A soundtrack for your best day'},
+        {'title': 'Good as Hell', 'artist': 'Lizzo', 'genre': 'Pop', 'emoji': '💪', 'reason': 'Confidence anthem for a great day'},
+    ],
 }
 
 ACTIVITIES_BY_MOOD = {
-    1: [{'title': 'Take a warm bath or shower', 'emoji': '🛁', 'duration': '20 min', 'benefit': 'Relaxes tension in your body'}, {'title': 'Write 3 things you are grateful for', 'emoji': '📝', 'duration': '5 min', 'benefit': 'Shifts focus to positive things'}, {'title': 'Call or text someone you trust', 'emoji': '📱', 'duration': '10 min', 'benefit': 'Connection heals sadness'}, {'title': 'Watch a comforting movie', 'emoji': '🎬', 'duration': '90 min', 'benefit': 'Distraction and emotional release'}, {'title': 'Gentle stretching or yoga', 'emoji': '🧘', 'duration': '15 min', 'benefit': 'Release physical tension from emotions'}],
-    2: [{'title': 'Go for a slow walk outside', 'emoji': '🚶', 'duration': '20 min', 'benefit': 'Nature and movement lift mood'}, {'title': 'Try a guided meditation', 'emoji': '🧘', 'duration': '10 min', 'benefit': 'Calm your racing thoughts'}, {'title': 'Cook your favorite comfort food', 'emoji': '🍲', 'duration': '30 min', 'benefit': 'Nourish your body and soul'}, {'title': 'Read a few pages of a book', 'emoji': '📖', 'duration': '15 min', 'benefit': 'Escape into another world'}, {'title': 'Organize one small space', 'emoji': '🧹', 'duration': '15 min', 'benefit': 'Small wins build momentum'}],
-    3: [{'title': 'Try a new hobby or skill', 'emoji': '🎨', 'duration': '30 min', 'benefit': 'Curiosity sparks creativity'}, {'title': 'Plan something fun for the weekend', 'emoji': '📅', 'duration': '10 min', 'benefit': 'Anticipation boosts happiness'}, {'title': 'Listen to a podcast', 'emoji': '🎧', 'duration': '20 min', 'benefit': 'Learn something new'}, {'title': 'Do a 15-minute workout', 'emoji': '💪', 'duration': '15 min', 'benefit': 'Endorphins elevate your day'}, {'title': 'Practice deep breathing', 'emoji': '🌬️', 'duration': '5 min', 'benefit': 'Reset and recharge'}],
-    4: [{'title': 'Share your happiness with a friend', 'emoji': '💬', 'duration': '10 min', 'benefit': 'Shared joy is doubled joy'}, {'title': 'Start a creative project', 'emoji': '🎭', 'duration': '30 min', 'benefit': 'Channel your positive energy'}, {'title': 'Dance to your favorite songs', 'emoji': '💃', 'duration': '15 min', 'benefit': 'Express joy through movement'}, {'title': 'Write a thank-you note to someone', 'emoji': '💌', 'duration': '10 min', 'benefit': 'Spread your positive energy'}, {'title': 'Try a challenging puzzle or game', 'emoji': '🧩', 'duration': '20 min', 'benefit': 'Ride the wave of mental clarity'}],
-    5: [{'title': 'Set an ambitious goal today', 'emoji': '🎯', 'duration': '10 min', 'benefit': 'Use this energy to dream big'}, {'title': 'Help someone in need', 'emoji': '🤝', 'duration': '20 min', 'benefit': 'Share your overflow of positivity'}, {'title': 'Try something you have been afraid of', 'emoji': '🦸', 'duration': '30 min', 'benefit': 'Courage peaks with great mood'}, {'title': 'Document this amazing day', 'emoji': '📸', 'duration': '10 min', 'benefit': 'Create memories to revisit later'}, {'title': 'Plan a surprise for someone you love', 'emoji': '🎁', 'duration': '15 min', 'benefit': 'Multiply the joy'}],
+    1: [
+        {'title': 'Take a warm bath or shower', 'emoji': '🛁', 'duration': '20 min', 'benefit': 'Relaxes tension in your body'},
+        {'title': 'Write 3 things you are grateful for', 'emoji': '📝', 'duration': '5 min', 'benefit': 'Shifts focus to positive things'},
+        {'title': 'Call or text someone you trust', 'emoji': '📱', 'duration': '10 min', 'benefit': 'Connection heals sadness'},
+        {'title': 'Watch a comforting movie', 'emoji': '🎬', 'duration': '90 min', 'benefit': 'Distraction and emotional release'},
+        {'title': 'Gentle stretching or yoga', 'emoji': '🧘', 'duration': '15 min', 'benefit': 'Release physical tension from emotions'},
+    ],
+    2: [
+        {'title': 'Go for a slow walk outside', 'emoji': '🚶', 'duration': '20 min', 'benefit': 'Nature and movement lift mood'},
+        {'title': 'Try a guided meditation', 'emoji': '🧘', 'duration': '10 min', 'benefit': 'Calm your racing thoughts'},
+        {'title': 'Cook your favorite comfort food', 'emoji': '🍲', 'duration': '30 min', 'benefit': 'Nourish your body and soul'},
+        {'title': 'Read a few pages of a book', 'emoji': '📖', 'duration': '15 min', 'benefit': 'Escape into another world'},
+        {'title': 'Organize one small space', 'emoji': '🧹', 'duration': '15 min', 'benefit': 'Small wins build momentum'},
+    ],
+    3: [
+        {'title': 'Try a new hobby or skill', 'emoji': '🎨', 'duration': '30 min', 'benefit': 'Curiosity sparks creativity'},
+        {'title': 'Plan something fun for the weekend', 'emoji': '📅', 'duration': '10 min', 'benefit': 'Anticipation boosts happiness'},
+        {'title': 'Listen to a podcast', 'emoji': '🎧', 'duration': '20 min', 'benefit': 'Learn something new'},
+        {'title': 'Do a 15-minute workout', 'emoji': '💪', 'duration': '15 min', 'benefit': 'Endorphins elevate your day'},
+        {'title': 'Practice deep breathing', 'emoji': '🌬️', 'duration': '5 min', 'benefit': 'Reset and recharge'},
+    ],
+    4: [
+        {'title': 'Share your happiness with a friend', 'emoji': '💬', 'duration': '10 min', 'benefit': 'Shared joy is doubled joy'},
+        {'title': 'Start a creative project', 'emoji': '🎭', 'duration': '30 min', 'benefit': 'Channel your positive energy'},
+        {'title': 'Dance to your favorite songs', 'emoji': '💃', 'duration': '15 min', 'benefit': 'Express joy through movement'},
+        {'title': 'Write a thank-you note to someone', 'emoji': '💌', 'duration': '10 min', 'benefit': 'Spread your positive energy'},
+        {'title': 'Try a challenging puzzle or game', 'emoji': '🧩', 'duration': '20 min', 'benefit': 'Ride the wave of mental clarity'},
+    ],
+    5: [
+        {'title': 'Set an ambitious goal today', 'emoji': '🎯', 'duration': '10 min', 'benefit': 'Use this energy to dream big'},
+        {'title': 'Help someone in need', 'emoji': '🤝', 'duration': '20 min', 'benefit': 'Share your overflow of positivity'},
+        {'title': 'Try something you have been afraid of', 'emoji': '🦸', 'duration': '30 min', 'benefit': 'Courage peaks with great mood'},
+        {'title': 'Document this amazing day', 'emoji': '📸', 'duration': '10 min', 'benefit': 'Create memories to revisit later'},
+        {'title': 'Plan a surprise for someone you love', 'emoji': '🎁', 'duration': '15 min', 'benefit': 'Multiply the joy'},
+    ],
 }
 
 MOOD_INSIGHTS = {
@@ -197,6 +252,7 @@ def get_assessment_summary(score, total):
 def register(request):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     data = parse_json_body(request)
     username = data.get('username', '').strip()
     email = data.get('email', '').strip().lower()
@@ -218,32 +274,134 @@ def register(request):
     if errors:
         return json_error(errors)
 
-    user = User.objects.create(username=username, email=email, password_hash=make_password(password), display_name=display_name or username)
-    token = create_access_token(user.id)
-    return JsonResponse({'message': 'Registration successful!', 'token': token, 'user': user.to_dict()}, status=201)
+    user = User.objects.create(
+        username=username,
+        email=email,
+        password_hash=make_password(password),
+        display_name=display_name or username,
+        is_email_verified=False,
+    )
+
+    otp = random.randint(100000, 999999)
+    otp_str = str(otp)
+    otp_hash = hashlib.sha256(otp_str.encode('utf-8')).hexdigest()
+
+    from django.utils import timezone as dj_timezone
+
+    now = dj_timezone.now()
+    otp_valid_minutes = int(os.environ.get('OTP_VALID_MINUTES', '10'))
+
+    user.otp_code_hash = otp_hash
+    user.otp_expires_at = now + timedelta(minutes=otp_valid_minutes)
+    user.otp_attempts = 0
+    user.otp_last_sent_at = now
+    user.save(update_fields=['otp_code_hash', 'otp_expires_at', 'otp_attempts', 'otp_last_sent_at', 'is_email_verified'])
+
+    # Console-based OTP delivery (Railway-friendly)
+    print(f"[MindBloom][OTP] email={email} otp={otp_str} expires_at={user.otp_expires_at.isoformat()}")
+
+    return JsonResponse({
+        'message': 'Registration successful. OTP sent. Please verify to continue.',
+        'otp_required': True,
+        'email': user.email,
+    }, status=201)
+
+
+@csrf_exempt
+def verify_otp(request):
+    if request.method != 'POST':
+        return json_error(['Method not allowed.'], status=405)
+
+    data = parse_json_body(request)
+    email = data.get('email', '').strip().lower()
+    otp = str(data.get('otp', '')).strip()
+
+    if not email or not otp:
+        return json_error(['Email and OTP are required.'])
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return json_error(['User not found.'], status=404)
+
+    from django.utils import timezone as dj_timezone
+
+    max_attempts = int(os.environ.get('OTP_MAX_ATTEMPTS', '5'))
+
+    if user.is_email_verified:
+        token = create_access_token(user.id, remember_me=bool(data.get('remember_me', False)))
+        return JsonResponse({'message': 'Already verified.', 'token': token, 'user': user.to_dict()})
+
+    if user.otp_attempts >= max_attempts:
+        return json_error(['OTP attempts exceeded. Please register again.'], status=403)
+
+    if not user.otp_expires_at or dj_timezone.now() > user.otp_expires_at:
+        return json_error(['OTP expired. Please register again.'], status=403)
+
+    otp_hash = hashlib.sha256(otp.encode('utf-8')).hexdigest()
+
+    if otp_hash != (user.otp_code_hash or ''):
+        user.otp_attempts = (user.otp_attempts or 0) + 1
+        user.save(update_fields=['otp_attempts'])
+        return json_error(['Invalid OTP.'], status=400)
+
+    user.is_email_verified = True
+    user.otp_code_hash = ''
+    user.otp_expires_at = None
+    user.otp_attempts = 0
+    user.save(update_fields=['is_email_verified', 'otp_code_hash', 'otp_expires_at', 'otp_attempts'])
+
+    remember_me = bool(data.get('remember_me', False))
+    token = create_access_token(user.id, remember_me=remember_me)
+    return JsonResponse({'message': 'OTP verified. Login successful.', 'token': token, 'user': user.to_dict()}, status=200)
 
 
 @csrf_exempt
 def login(request):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     data = parse_json_body(request)
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
+
     if not email or not password:
         return json_error(['Email and password are required.'])
+
     try:
         user = User.objects.get(email=email)
     except User.DoesNotExist:
         return JsonResponse({'errors': ['No account found with this email. Please register first.'], 'error_type': 'not_registered'}, status=401)
+
     if not check_password(password, user.password_hash):
         return json_error(['Incorrect password. Please try again.'], status=401)
-    token = create_access_token(user.id)
+
+    if not getattr(user, 'is_email_verified', False):
+        return JsonResponse({'errors': ['Email not verified. Please verify OTP first.'], 'error_type': 'email_not_verified', 'email': user.email}, status=403)
+
+    remember_me = bool(data.get('remember_me', False))
+    token = create_access_token(user.id, remember_me=remember_me)
+
+    try:
+        from django.utils import timezone as dj_timezone
+        user.last_login_at = dj_timezone.now()
+        user.save(update_fields=['last_login_at'])
+    except Exception:
+        pass
+
     return JsonResponse({'message': 'Login successful!', 'token': token, 'user': user.to_dict()})
 
 
 @jwt_required
 def me(request):
+    # best-effort activity tracking
+    try:
+        from django.utils import timezone as dj_timezone
+        request._current_user.last_activity_at = dj_timezone.now()
+        request._current_user.save(update_fields=['last_activity_at'])
+    except Exception:
+        pass
+
     return JsonResponse({'user': request._current_user.to_dict()})
 
 
@@ -285,6 +443,7 @@ def tasks(request):
 def toggle_task(request, task_id):
     if request.method != 'PUT':
         return json_error(['Method not allowed.'], status=405)
+
     try:
         task = DailyTask.objects.get(id=task_id, user=request._current_user)
     except DailyTask.DoesNotExist:
@@ -388,6 +547,7 @@ def suggestions(request):
     recommended_tests = MOOD_TEST_RECOMMENDATIONS.get(mood, MOOD_TEST_RECOMMENDATIONS[3])
     selected_music = random.sample(music, min(2, len(music)))
     selected_activities = random.sample(activities, min(3, len(activities)))
+
     hour = datetime.now().hour
     if hour < 6:
         time_context = "It's late - consider winding down soon."
@@ -399,9 +559,23 @@ def suggestions(request):
         time_context = 'Evening - time to reflect on your day.'
     else:
         time_context = 'Night time - relax and prepare for rest.'
-    entries_this_week = JournalEntry.objects.filter(user=user, created_at__gte=datetime.combine(date.today() - timedelta(days=7), datetime.min.time())).count()
+
+    entries_this_week = JournalEntry.objects.filter(
+        user=user,
+        created_at__gte=datetime.combine(date.today() - timedelta(days=7), datetime.min.time()),
+    ).count()
     tests_taken = TestResult.objects.filter(user=user).count()
-    return JsonResponse({'mood': mood, 'mood_label': ['', 'Very Sad', 'Sad', 'Normal', 'Happy', 'Very Happy'][mood], 'insight': insight, 'music': selected_music, 'activities': selected_activities, 'recommended_tests': recommended_tests, 'time_context': time_context, 'stats': {'journal_entries_this_week': entries_this_week, 'total_tests_taken': tests_taken}})
+
+    return JsonResponse({
+        'mood': mood,
+        'mood_label': ['', 'Very Sad', 'Sad', 'Normal', 'Happy', 'Very Happy'][mood],
+        'insight': insight,
+        'music': selected_music,
+        'activities': selected_activities,
+        'recommended_tests': recommended_tests,
+        'time_context': time_context,
+        'stats': {'journal_entries_this_week': entries_this_week, 'total_tests_taken': tests_taken},
+    })
 
 
 @jwt_required
@@ -421,11 +595,14 @@ def journal_prompts(request, journal_type):
 @jwt_required
 def journal_entries(request):
     user = request._current_user
+
     if request.method == 'GET':
         entries = JournalEntry.objects.filter(user=user).order_by('-created_at')
         return JsonResponse({'entries': [entry.to_dict() for entry in entries]})
+
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     if request.content_type and 'multipart' in request.content_type:
         payload = request.POST
         journal_type = payload.get('journal_type', '')
@@ -446,9 +623,20 @@ def journal_entries(request):
         activities = payload.get('activities', [])
         answers = payload.get('answers', {})
         photo_url = payload.get('photo_url', '')
+
     if journal_type not in ['release_worry', 'calm_anxiety', 'feeling_angry', 'feeling_happy']:
         return json_error(['Invalid journal type.'])
-    entry = JournalEntry.objects.create(user=user, journal_type=journal_type, note=note, mood=mood, feelings=json.dumps(feelings), activities=json.dumps(activities), photo_url=photo_url, answers=json.dumps(answers))
+
+    entry = JournalEntry.objects.create(
+        user=user,
+        journal_type=journal_type,
+        note=note,
+        mood=mood,
+        feelings=json.dumps(feelings),
+        activities=json.dumps(activities),
+        photo_url=photo_url,
+        answers=json.dumps(answers),
+    )
     return JsonResponse({'entry': entry.to_dict()}, status=201)
 
 
@@ -459,6 +647,7 @@ def tests_list(request):
     query = TestDefinition.objects.all()
     if search:
         query = query.filter(title__icontains=search)
+
     tests = list(query)
     taken_ids = set(TestResult.objects.filter(user=user).values_list('test_id', flat=True))
 
@@ -468,7 +657,7 @@ def tests_list(request):
         data['times_taken'] = TestResult.objects.filter(user=user, test=test).count()
         return data
 
-    return JsonResponse({'featured': [enrich(test) for test in tests if test.is_featured], 'tests': [enrich(test) for test in tests]})
+    return JsonResponse({'featured': [enrich(t) for t in tests if t.is_featured], 'tests': [enrich(t) for t in tests]})
 
 
 @jwt_required
@@ -478,11 +667,14 @@ def test_detail(request, test_id):
         test = TestDefinition.objects.get(id=test_id)
     except TestDefinition.DoesNotExist:
         return json_error(['Test not found.'], status=404)
+
     times_taken = TestResult.objects.filter(user=user, test=test).count()
     data = test.to_dict(include_questions=True)
+
     if times_taken > 0:
         random.seed(user.id + times_taken)
         random.shuffle(data['questions'])
+
     data['taken'] = times_taken > 0
     data['times_taken'] = times_taken
     return JsonResponse({'test': data})
@@ -493,52 +685,86 @@ def test_detail(request, test_id):
 def submit_test(request, test_id):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     user = request._current_user
     try:
         test = TestDefinition.objects.get(id=test_id)
     except TestDefinition.DoesNotExist:
         return json_error(['Test not found.'], status=404)
+
     payload = parse_json_body(request)
     answers = payload.get('answers', {})
-    score = sum(1 for value in answers.values() if value is True)
+
+    score = sum(1 for v in answers.values() if v is True)
     total = test.questions.count()
-    result = TestResult.objects.create(user=user, test=test, answers_json=json.dumps(answers), score=score, result_text=get_result_text(test.title, score, total))
-    return JsonResponse({'result': result.to_dict(), 'score': score, 'total': total, 'percentage': round(score / total * 100) if total > 0 else 0}, status=201)
+
+    result = TestResult.objects.create(
+        user=user,
+        test=test,
+        answers_json=json.dumps(answers),
+        score=score,
+        result_text=get_result_text(test.title, score, total),
+    )
+
+    return JsonResponse({
+        'result': result.to_dict(),
+        'score': score,
+        'total': total,
+        'percentage': round(score / total * 100) if total > 0 else 0,
+    }, status=201)
 
 
 @jwt_required
 def test_results(request):
     user = request._current_user
     results = TestResult.objects.filter(user=user).order_by('-created_at')
-    return JsonResponse({'results': [result.to_dict() for result in results]})
+    return JsonResponse({'results': [r.to_dict() for r in results]})
 
 
 @jwt_required
 def assessment(request):
     user = request._current_user
+
     if request.method == 'GET':
         questions = AssessmentQuestion.objects.order_by('order_num')
         times_taken = AssessmentResult.objects.filter(user=user).count()
-        question_list = [question.to_dict() for question in questions]
+        question_list = [q.to_dict() for q in questions]
         if times_taken > 0:
             random.seed(user.id + times_taken)
             random.shuffle(question_list)
         return JsonResponse({'questions': question_list, 'has_taken': times_taken > 0, 'times_taken': times_taken})
+
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     payload = parse_json_body(request)
     answers = payload.get('answers', {})
-    score = sum(1 for value in answers.values() if value is True)
+    score = sum(1 for v in answers.values() if v is True)
     total = len(answers)
+
     summary = get_assessment_summary(score, total)
-    result = AssessmentResult.objects.create(user=user, answers_json=json.dumps(answers), score=score, result_summary=json.dumps(summary), category=summary['category'])
-    return JsonResponse({'result': result.to_dict(), 'score': score, 'total': total, 'percentage': round(score / total * 100) if total > 0 else 0, 'summary': summary}, status=201)
+    result = AssessmentResult.objects.create(
+        user=user,
+        answers_json=json.dumps(answers),
+        score=score,
+        result_summary=json.dumps(summary),
+        category=summary['category'],
+    )
+
+    return JsonResponse({
+        'result': result.to_dict(),
+        'score': score,
+        'total': total,
+        'percentage': round(score / total * 100) if total > 0 else 0,
+        'summary': summary,
+    }, status=201)
 
 
 @jwt_required
 def assessment_results(request):
     user = request._current_user
     results = AssessmentResult.objects.filter(user=user).order_by('-created_at')
+
     parsed = []
     for result in results:
         data = result.to_dict()
@@ -547,6 +773,7 @@ def assessment_results(request):
         except (json.JSONDecodeError, TypeError):
             data['parsed_summary'] = None
         parsed.append(data)
+
     return JsonResponse({'results': parsed})
 
 
@@ -554,18 +781,22 @@ def assessment_results(request):
 def admin_alerts(request):
     if request.method != 'GET':
         return json_error(['Method not allowed.'], status=405)
+
     status_filter = request.GET.get('status', '').strip()
     severity = request.GET.get('severity', '').strip()
+
     alerts = Alert.objects.select_related('user', 'reviewed_by').order_by('-created_at')
     if status_filter:
         alerts = alerts.filter(status=status_filter)
     if severity.isdigit():
         alerts = alerts.filter(severity=int(severity))
+
     payload = []
     for alert in alerts:
         data = alert.to_dict()
         data['user'] = alert.user.to_dict()
         payload.append(data)
+
     return JsonResponse({'alerts': payload})
 
 
@@ -573,12 +804,14 @@ def admin_alerts(request):
 def admin_alert_detail(request, alert_id):
     if request.method != 'GET':
         return json_error(['Method not allowed.'], status=405)
+
     try:
         alert = Alert.objects.select_related('user', 'reviewed_by').get(id=alert_id)
     except Alert.DoesNotExist:
         return json_error(['Alert not found.'], status=404)
+
     audits = AlertAudit.objects.filter(alert=alert).order_by('created_at')
-    return JsonResponse({'alert': alert.to_dict(), 'user': alert.user.to_dict(), 'audits': [audit.to_dict() for audit in audits]})
+    return JsonResponse({'alert': alert.to_dict(), 'user': alert.user.to_dict(), 'audits': [a.to_dict() for a in audits]})
 
 
 @csrf_exempt
@@ -586,11 +819,14 @@ def admin_alert_detail(request, alert_id):
 def admin_alert_acknowledge(request, alert_id):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     try:
         alert = Alert.objects.get(id=alert_id)
     except Alert.DoesNotExist:
         return json_error(['Alert not found.'], status=404)
+
     from .ml_models.alert_service import acknowledge_alert
+
     payload = parse_json_body(request)
     note = payload.get('note', '')
     updated = acknowledge_alert(alert, request._current_user, note=note)
@@ -602,16 +838,20 @@ def admin_alert_acknowledge(request, alert_id):
 def admin_alert_resolve(request, alert_id):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     try:
         alert = Alert.objects.get(id=alert_id)
     except Alert.DoesNotExist:
         return json_error(['Alert not found.'], status=404)
+
     from .ml_models.alert_service import resolve_alert
+
     payload = parse_json_body(request)
     note = payload.get('note', '')
     status = payload.get('status', Alert.STATUS_RESOLVED)
     if status not in {Alert.STATUS_RESOLVED, Alert.STATUS_FALSE}:
         status = Alert.STATUS_RESOLVED
+
     updated = resolve_alert(alert, request._current_user, note=note, status=status)
     return JsonResponse({'alert': updated.to_dict()})
 
@@ -620,6 +860,7 @@ def admin_alert_resolve(request, alert_id):
 def admin_alert_stats(request):
     if request.method != 'GET':
         return json_error(['Method not allowed.'], status=405)
+
     alerts = Alert.objects.all()
     totals = {
         'total_alerts': alerts.count(),
@@ -638,14 +879,18 @@ def admin_alert_stats(request):
 def admin_alert_score(request):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     data = parse_json_body(request)
     model_dir = data.get('model_dir', 'backend/ml_models')
     feature_path = data.get('feature_path', 'backend/ml_data/features.parquet')
     threshold = float(data.get('threshold', 0.8))
+
     if not os.path.exists(feature_path):
         return json_error(['Feature file not found. Run feature extraction first.'], status=400)
+
     if not os.path.exists(os.path.join(model_dir, 'meta.joblib')):
         return json_error(['Model artifacts not found. Train the anomaly model first.'], status=400)
+
     import pandas as pd
     from .ml_models.anomaly_ensemble import load_artifacts, score_features
     from .ml_models.alert_service import create_alerts_from_scores
@@ -654,6 +899,7 @@ def admin_alert_score(request):
     artifacts = load_artifacts(model_dir)
     scored = score_features(artifacts, df)
     created = create_alerts_from_scores(df, scored, threshold=threshold)
+
     return JsonResponse({'scored_rows': len(scored), 'alerts_created': len(created), 'threshold': threshold})
 
 
@@ -662,6 +908,7 @@ def admin_alert_score(request):
 def admin_model_retrain(request):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     payload = parse_json_body(request)
     model_dir = payload.get('model_dir', 'backend/ml_models')
     feature_path = payload.get('feature_path', 'backend/ml_data/features.parquet')
@@ -672,42 +919,54 @@ def admin_model_retrain(request):
     if not os.path.exists(feature_path):
         return json_error(['Feature file not found. Run feature extraction first.'], status=400)
 
-    # start a tracked job and run training in the background
     job_meta = {'epochs': epochs, 'batch_size': batch_size, 'contamination': contamination}
     os.makedirs(model_dir, exist_ok=True)
     job_id = job_tracker.start_job(model_dir, meta=job_meta)
 
-    def _train_worker(job_id):
+    def _train_worker(job_id_inner):
         import sys
         import subprocess
+
         try:
-            job_tracker.update_job(model_dir, job_id, status='running', note='Training started')
-            # run as a module so package imports like `api.*` resolve correctly
-            cmd = [sys.executable, '-m', 'api.ml_training.train_anomaly', '--features', feature_path, '--model-dir', model_dir, '--contamination', str(contamination), '--epochs', str(epochs), '--batch-size', str(batch_size), '--verbose', '1']
+            job_tracker.update_job(model_dir, job_id_inner, status='running', note='Training started')
+            cmd = [
+                sys.executable,
+                '-m',
+                'api.ml_training.train_anomaly',
+                '--features',
+                feature_path,
+                '--model-dir',
+                model_dir,
+                '--contamination',
+                str(contamination),
+                '--epochs',
+                str(epochs),
+                '--batch-size',
+                str(batch_size),
+                '--verbose',
+                '1',
+            ]
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            # stream output and append to job log
             for line in proc.stdout:
-                job_tracker.update_job(model_dir, job_id, note=line.strip())
+                job_tracker.update_job(model_dir, job_id_inner, note=line.strip())
             ret = proc.wait()
             if ret == 0:
-                job_tracker.update_job(model_dir, job_id, status='completed', note='Training completed')
+                job_tracker.update_job(model_dir, job_id_inner, status='completed', note='Training completed')
             else:
-                job_tracker.update_job(model_dir, job_id, status='failed', note=f'Training process exited with code {ret}')
+                job_tracker.update_job(model_dir, job_id_inner, status='failed', note=f'Training process exited with code {ret}')
         except Exception as exc:
             try:
-                job_tracker.update_job(model_dir, job_id, status='failed', note=f'Error: {exc}')
+                job_tracker.update_job(model_dir, job_id_inner, status='failed', note=f'Error: {exc}')
             except Exception:
                 pass
 
-    # If Celery is available and configured, prefer to enqueue the retrain task.
     try:
         from .tasks import retrain_model_task
-        # enqueue Celery task; it will update the job via job_tracker
         retrain_model_task.apply_async(args=(job_id, model_dir, feature_path, contamination, epochs, batch_size))
     except Exception:
-        # Celery not available or failed to enqueue — fall back to local thread subprocess worker
         thread = threading.Thread(target=_train_worker, args=(job_id,), daemon=True)
         thread.start()
+
     return JsonResponse({'message': 'Retrain job queued', 'job_id': job_id, 'model_dir': model_dir})
 
 
@@ -715,6 +974,7 @@ def admin_model_retrain(request):
 def admin_model_job_status(request, job_id):
     if request.method != 'GET':
         return json_error(['Method not allowed.'], status=405)
+
     model_dir = request.GET.get('model_dir', 'backend/ml_models')
     job = job_tracker.get_job(model_dir, job_id)
     if not job:
@@ -726,6 +986,7 @@ def admin_model_job_status(request, job_id):
 def admin_model_jobs_list(request):
     if request.method != 'GET':
         return json_error(['Method not allowed.'], status=405)
+
     model_dir = request.GET.get('model_dir', 'backend/ml_models')
     jobs = job_tracker.list_jobs(model_dir)
     return JsonResponse({'jobs': jobs})
@@ -739,6 +1000,7 @@ def profile(request):
         return JsonResponse({'user': user.to_dict()})
     if request.method != 'PUT':
         return json_error(['Method not allowed.'], status=405)
+
     if request.content_type and 'multipart' in request.content_type:
         display_name = request.POST.get('display_name', user.display_name)
         avatar = request.FILES.get('avatar')
@@ -751,6 +1013,7 @@ def profile(request):
             user.display_name = payload['display_name']
         if 'avatar_url' in payload:
             user.avatar_url = payload['avatar_url']
+
     user.save(update_fields=['display_name', 'avatar_url'])
     return JsonResponse({'user': user.to_dict()})
 
@@ -760,14 +1023,20 @@ def profile(request):
 def change_password(request):
     if request.method != 'POST':
         return json_error(['Method not allowed.'], status=405)
+
     user = request._current_user
     payload = parse_json_body(request)
+
     current_pw = payload.get('current_password', '')
     new_pw = payload.get('new_password', '')
+
     if not check_password(current_pw, user.password_hash):
         return json_error(['Current password is incorrect.'])
+
     if len(new_pw) < 6:
         return json_error(['New password must be at least 6 characters.'])
+
     user.password_hash = make_password(new_pw)
     user.save(update_fields=['password_hash'])
     return JsonResponse({'message': 'Password changed successfully.'})
+

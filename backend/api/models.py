@@ -9,10 +9,22 @@ class User(models.Model):
     username = models.CharField(max_length=80, unique=True)
     email = models.CharField(max_length=120, unique=True)
     password_hash = models.CharField(max_length=256)
+
     display_name = models.CharField(max_length=100, blank=True, default='')
     avatar_url = models.CharField(max_length=500, blank=True, default='')
     is_admin = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
+
+    # Email verification + OTP (console-based)
+    is_email_verified = models.BooleanField(default=False)
+    otp_code_hash = models.CharField(max_length=256, blank=True, default='')
+    otp_expires_at = models.DateTimeField(null=True, blank=True)
+    otp_attempts = models.PositiveIntegerField(default=0)
+    otp_last_sent_at = models.DateTimeField(null=True, blank=True)
+
+    # Security timestamps
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    last_activity_at = models.DateTimeField(null=True, blank=True)
 
     def to_dict(self):
         return {

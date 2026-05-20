@@ -4,7 +4,9 @@ from . import views
 
 urlpatterns = [
     path('auth/register', views.register),
+    path('auth/verify-otp', views.verify_otp),
     path('auth/login', views.login),
+
     path('auth/me', views.me),
     path('home/tasks', views.tasks),
     path('home/tasks/<int:task_id>', views.toggle_task),

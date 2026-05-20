@@ -42,7 +42,7 @@ export default function Profile() {
   const initial = (user.display_name || user.username || '?')[0].toUpperCase();
 
   return (
-    <div className="page">
+    <div className="page profile-page">
       <div className="profile-header">
         <div className="avatar">{initial}</div>
         <h2>{user.display_name || user.username}</h2>
@@ -105,6 +105,7 @@ export default function Profile() {
               <label>Confirm New Password</label>
               <input type="password" value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} />
             </div>
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn btn-primary btn-sm" onClick={handleChangePw}>Save</button>
               <button className="btn btn-outline btn-sm" onClick={() => setChangingPw(false)}>Cancel</button>
