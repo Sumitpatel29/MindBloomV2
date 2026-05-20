@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { journalAPI } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import PageGreeting from '../components/PageGreeting';
 
 const JOURNAL_TYPES = [
   { key: 'release_worry', title: 'Release Worry', desc: "Let go of the day's stressors.", icon: '🌿', bg: 'linear-gradient(135deg, #66BB6A, #43A047)' },
@@ -19,6 +21,7 @@ const TYPE_ICONS = {
 const MOOD_LABELS = ['', 'Very Sad', 'Sad', 'Normal', 'Happy', 'Very Happy'];
 
 export default function Journal() {
+  const { user } = useAuth();
   const [entries, setEntries] = useState([]);
 
   useEffect(() => {
@@ -27,9 +30,10 @@ export default function Journal() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h1>Journal</h1>
-      </div>
+      <PageGreeting
+        name={user?.display_name || user?.username}
+        subtitle="Guided prompts to release, reflect, and reset."
+      />
 
       <div className="journal-types">
         {JOURNAL_TYPES.map(jt => (
@@ -42,7 +46,7 @@ export default function Journal() {
       </div>
 
       <div className="entries-section">
-        <h2 className="section-title">📝 Your Entries</h2>
+        <h2 className="section-eyebrow">Your entries</h2>
         {entries.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '30px' }}>
             <p style={{ fontSize: '40px', marginBottom: '8px' }}>📖</p>

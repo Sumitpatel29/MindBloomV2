@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { testsAPI } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import PageGreeting from '../components/PageGreeting';
 
 const CATEGORY_ICONS = {
   personality: '🧠',
@@ -10,6 +12,7 @@ const CATEGORY_ICONS = {
 };
 
 export default function Tests() {
+  const { user } = useAuth();
   const [tests, setTests] = useState([]);
   const [featured, setFeatured] = useState([]);
   const [search, setSearch] = useState('');
@@ -25,7 +28,11 @@ export default function Tests() {
 
   return (
     <div className="page">
-      {/* Search */}
+      <PageGreeting
+        name={user?.display_name || user?.username}
+        subtitle="Explore assessments tailored to your self-discovery journey."
+      />
+
       <div className="search-bar">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -47,15 +54,15 @@ export default function Tests() {
               <span>{featuredTest.duration_min} min</span>
               <span>{featuredTest.question_count} questions</span>
             </div>
-            <button className="btn btn-lg" style={{ background: 'var(--warning)', color: 'white', border: 'none' }}>
+            <span className="hero-card__cta" style={{ marginTop: 0 }}>
               {featuredTest.taken ? 'Retake test →' : 'Take test →'}
-            </button>
+            </span>
           </div>
         </Link>
       )}
 
       {/* Popular */}
-      <div className="section-title">⭐ Most Popular</div>
+      <h2 className="section-eyebrow">Most popular</h2>
       <div className="tests-grid">
         {tests.map(test => (
           <Link key={test.id} to={`/tests/${test.id}`} className="test-card">

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { growthAPI } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import PageGreeting from '../components/PageGreeting';
 
 export default function Growth() {
+  const { user } = useAuth();
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
@@ -56,9 +59,10 @@ export default function Growth() {
   if (!started) {
     return (
       <div className="page">
-        <div className="page-header">
-          <h1>Growth</h1>
-        </div>
+        <PageGreeting
+          name={user?.display_name || user?.username}
+          subtitle="Personal insights and practical tips for your next step."
+        />
 
         <div className="growth-hero">
           <div className="hero-icon">🧩</div>
@@ -78,7 +82,7 @@ export default function Growth() {
 
         {pastResults.length > 0 && (
           <div className="entries-section" style={{ marginTop: '24px' }}>
-            <h3 className="section-title">📊 Past Assessments</h3>
+            <h3 className="section-eyebrow">Past assessments</h3>
             {pastResults.map(r => (
               <div key={r.id} className="entry-item">
                 <div className="entry-icon" style={{ background: '#E8F5E9' }}>📊</div>
